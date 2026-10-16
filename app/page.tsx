@@ -25,7 +25,7 @@ export default function Home(){
   const person=useRef('');
   const cardRef=useRef<string[]>([]);
   const selectedRef=useRef<Set<string>>(new Set());
-  const seen=useRef<Set<string>>(new Set());
+  const bingoNotified=useRef(false);
   const lastCall=useRef<number|null>(null);
   const refresh=useCallback(async()=>{try{const r=await fetch('/api/game',{cache:'no-store'});if(!r.ok)throw Error();setGame(await r.json());setStatus('');}catch{setStatus('Live totals are taking a little break.');}},[]);
   const save=useCallback(async(extra:Record<string,unknown>)=>{const r=await fetch('/api/game',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({participantId:person.current,...extra})});const payload=await r.json() as GameSnapshot & {error?:string};if(!r.ok)throw Error(payload.error||'Couldn’t save that.');setGame(payload);setStatus('');return payload;},[]);
@@ -34,16 +34,16 @@ export default function Home(){
     let c:string[]=[];try{c=JSON.parse(localStorage.getItem('ai-bingo-card')||'[]');}catch{/* new card */}
     if(c.length!==25||c[12]!=='free'||new Set(c).size!==25||c.some(x=>x!=='free'&&!ids.includes(x as typeof ids[number]))){c=shuffleCard();localStorage.setItem('ai-bingo-card',JSON.stringify(c));}cardRef.current=c;setCard(c);
     let old:string[]=[];try{old=JSON.parse(localStorage.getItem('ai-bingo-picked')||'[]');}catch{/* empty */}
-    const s=new Set(old.filter(x=>ids.includes(x as typeof ids[number])));selectedRef.current=s;setSelected(s);seen.current=new Set(winningLines(c,s));setWinnerName(localStorage.getItem('ai-bingo-name')||'');
+    const s=new Set(old.filter(x=>ids.includes(x as typeof ids[number])));selectedRef.current=s;setSelected(s);bingoNotified.current=localStorage.getItem('ai-bingo-notified')==='yes'||winningLines(c,s).length>0;setAnnounced(localStorage.getItem('ai-bingo-announced')==='yes');setWinnerName(localStorage.getItem('ai-bingo-name')||'');
     refresh();save({}).catch(()=>setStatus('Live totals are taking a little break.'));
     const timer=setInterval(refresh,2500);return()=>clearInterval(timer);
   },[refresh,save]);
   useEffect(()=>{const callId=game.currentCall?.id??null;if(callId!==lastCall.current){lastCall.current=callId;setMyAnswer(callId?localStorage.getItem(`ai-bingo-answer-${callId}`) as 'yes'|'no'|null:null);}},[game.currentCall?.id]);
-  function mark(id:string,checked:boolean){const next=new Set(selectedRef.current);if(checked)next.add(id);else next.delete(id);selectedRef.current=next;setSelected(next);localStorage.setItem('ai-bingo-picked',JSON.stringify([...next]));const lines=winningLines(cardRef.current,next);if(lines.some(line=>!seen.current.has(line)))setBingo(true);seen.current=new Set(lines);}
+  function mark(id:string,checked:boolean){const next=new Set(selectedRef.current);if(checked)next.add(id);else next.delete(id);selectedRef.current=next;setSelected(next);localStorage.setItem('ai-bingo-picked',JSON.stringify([...next]));if(winningLines(cardRef.current,next).length>0&&!bingoNotified.current){bingoNotified.current=true;localStorage.setItem('ai-bingo-notified','yes');setBingo(true);}}
   async function toggle(id:string){if(busy.has(id))return;const checked=!selectedRef.current.has(id);setBusy(old=>new Set(old).add(id));try{await save({promptId:id,checked});mark(id,checked);}catch(e){setStatus(e instanceof Error?e.message:'That square didn’t save.');}finally{setBusy(old=>{const next=new Set(old);next.delete(id);return next;});}}
   async function answer(value:'yes'|'no'){const call=game.currentCall;if(!call||answering)return;setAnswering(value);try{await save({action:'answer',callId:call.id,answer:value});localStorage.setItem(`ai-bingo-answer-${call.id}`,value);setMyAnswer(value);if(cardRef.current.includes(call.promptId))mark(call.promptId,value==='yes');else if(value==='yes')setStatus('That confession counts for the team. It isn’t on this card.');}catch(e){setStatus(e instanceof Error?e.message:'Couldn’t save your answer.');}finally{setAnswering(null);}}
-  function mix(){const c=shuffleCard();cardRef.current=c;setCard(c);localStorage.setItem('ai-bingo-card',JSON.stringify(c));seen.current=new Set(winningLines(c,selectedRef.current));setBingo(false);}
-  async function claim(){if(!winnerName.trim())return;setClaiming(true);try{await save({action:'win',name:winnerName.trim(),card:cardRef.current});localStorage.setItem('ai-bingo-name',winnerName.trim());setAnnounced(true);setBingo(false);}catch(e){setStatus(e instanceof Error?e.message:'Couldn’t announce your bingo.');}finally{setClaiming(false);}}
+  function mix(){const c=shuffleCard();cardRef.current=c;setCard(c);localStorage.setItem('ai-bingo-card',JSON.stringify(c));setBingo(false);}
+  async function claim(){if(!winnerName.trim())return;setClaiming(true);try{await save({action:'win',name:winnerName.trim(),card:cardRef.current});localStorage.setItem('ai-bingo-name',winnerName.trim());localStorage.setItem('ai-bingo-announced','yes');bingoNotified.current=true;localStorage.setItem('ai-bingo-notified','yes');setAnnounced(true);setBingo(false);}catch(e){setStatus(e instanceof Error?e.message:'Couldn’t announce your bingo.');}finally{setClaiming(false);}}
   const count=(id:string)=>game.counts[id]||0;
   const max=Math.max(1,...Object.values(game.counts));
   const top=[...prompts].sort((a,b)=>count(b.id)-count(a.id)).slice(0,4);
