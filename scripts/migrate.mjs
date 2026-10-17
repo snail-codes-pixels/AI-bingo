@@ -27,6 +27,7 @@ export async function migrate() {
       prompt_id text NOT NULL,
       started_at timestamptz NOT NULL DEFAULT now()
     )`);
+    await client.query('ALTER TABLE calls ADD COLUMN IF NOT EXISTS answer_ends_at timestamptz');
     await client.query(`CREATE TABLE IF NOT EXISTS call_answers (
       call_id bigint NOT NULL REFERENCES calls(id),
       participant_id uuid NOT NULL REFERENCES participants(id),

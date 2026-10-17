@@ -30,6 +30,7 @@ export default function Home(){
   const lastCall=useRef<number|null>(null);
   const gameIdRef=useRef<number|null>(null);
   const applySnapshot=useCallback((next:GameSnapshot)=>{
+    next.receivedAt=Date.now();
     if(gameIdRef.current!==null&&next.gameId<gameIdRef.current)return;
     if(gameIdRef.current!==null&&next.gameId>gameIdRef.current){
       const id=crypto.randomUUID(),newCard=shuffleCard();person.current=id;cardRef.current=newCard;selectedRef.current=new Set();notifiedLines.current=new Set();announcedRef.current=new Set();lastCall.current=null;
