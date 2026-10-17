@@ -42,3 +42,14 @@
 @media(max-width:950px){.host-reset-panel{grid-column:1/-1}}
 @media(max-width:650px){.host-card-hand{height:325px}.host-card-under,.host-playing-card{width:204px;height:282px;top:13px}.host-card-left{transform:translateX(-50%) translateX(-45px) rotate(-13deg)}.host-card-right{transform:translateX(-50%) translateX(45px) rotate(13deg)}.host-playing-front{padding:14px 10px;gap:7px}.host-playing-front p{font-size:19px}.host-playing-front .host-card-emoji{font-size:34px}.host-playing-front small{font-size:9px}.host-card-corner{font-size:11px;top:13px;left:13px}}
 @media(prefers-reduced-motion:reduce){.host-playing-card{animation:none}}
+
+/* Keep the player question as warm and light as the rest of the game. */
+.caller-strip:not(.waiting){background:linear-gradient(120deg,#fff3e8,#ffe7d5);border:1px solid #ebc9b2;color:#493930;box-shadow:0 8px 24px #b8795117}
+.caller-strip .kicker{color:#a95437}
+.caller-strip .call-live{color:#a95437}
+.caller-strip .called-statement h2 strong{color:#bd6544}
+.caller-strip .call-foot{color:#755a4b}
+.caller-strip .caller-actions .chosen{outline-color:#ac5c3e}
+.caller-strip .answer-clock:not(.answer-clock-done){background:#fffaf4;border-color:#e8bea6;color:#865138}
+.caller-strip .answer-clock-soon:not(.answer-clock-done){background:#ffe0ca;border-color:#e8a17d;color:#78442e}
+.caller-strip .answer-clock-done{background:#f5e9de;border-color:#e7c8b5;color:#75594b}
