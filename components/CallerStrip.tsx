@@ -1,11 +1,32 @@
 'use client';
+import { useEffect, useState } from 'react';
 import { prompts } from '../lib/prompts';
 import type { GameSnapshot } from '../lib/game-types';
 
+export function useAnswerSeconds(game: GameSnapshot) {
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, []);
+  const remaining = game.currentCall?.remainingMs;
+  if (remaining == null || !now || !game.receivedAt) return null;
+  return Math.max(0, Math.ceil((remaining - (now - game.receivedAt)) / 1000));
+}
+
+export function AnswerClock({ seconds, host = false }: { seconds: number | null; host?: boolean }) {
+  if (seconds === null) return null;
+  return <div className={`answer-clock ${host ? 'answer-clock-host' : ''} ${seconds <= 10 ? 'answer-clock-soon' : ''} ${seconds === 0 ? 'answer-clock-done' : ''}`} role="timer" aria-label={seconds === 0 ? 'Answer time is up' : `${seconds} seconds to answer`}>
+    <span aria-hidden="true">⏳</span><strong>{seconds === 0 ? 'Time’s up!' : `${seconds}s`}</strong><span>{seconds === 0 ? host ? 'Call the next confession when ready' : 'Wait for the next confession' : 'to answer'}</span>
+  </div>;
+}
+
 export default function CallerStrip({ game, answer, myAnswer, onAnswer, onOpenHost }: { game: GameSnapshot; answer: 'yes'|'no'|null; myAnswer: 'yes'|'no'|null; onAnswer: (answer: 'yes'|'no') => Promise<void>; onOpenHost: () => void }) {
+  const seconds=useAnswerSeconds(game);
   const call=game.currentCall;
   const prompt=prompts.find(p=>p.id===call?.promptId);
   if(!call||!prompt) return <section className="caller-strip waiting"><div className="caller-icon">🎤</div><div><span className="kicker">CALLER MODE</span><h2>Waiting for the first confession</h2><p>Your caller will read it aloud. Tap Yes or No to answer.</p></div><button className="caller-link" onClick={onOpenHost}>Open caller screen ↗</button></section>;
   const phrase=prompt.text.startsWith("I've ")?prompt.text.slice(5):prompt.text==='AI has genuinely surprised me'?'been genuinely surprised by AI':prompt.text;
-  return <section className="caller-strip" aria-label="Current bingo call"><div className="caller-strip-top"><span className="kicker">🎤 CONFESSION {game.calledCount} OF {prompts.length}</span><span className="call-live">● LIVE CALL</span></div><div className="called-statement"><span>{prompt.emoji}</span><h2>Never have I ever… <strong>{phrase}</strong></h2></div><div className="caller-actions"><button className={`answer yes ${myAnswer==='yes'?'chosen':''}`} onClick={()=>onAnswer('yes')} disabled={answer!==null}>🙋 Yes, I have</button><button className={`answer no ${myAnswer==='no'?'chosen':''}`} onClick={()=>onAnswer('no')} disabled={answer!==null}>🙅 No, I haven&apos;t</button></div><div className="call-foot"><span>{myAnswer ? `You answered ${myAnswer.toUpperCase()}. ${myAnswer==='yes'?'Square marked if it’s on your card!':''}` : 'A “yes” marks your square automatically if it’s on your card.'}</span><span>🙋 {game.yes} yes &nbsp; 🙅 {game.no} no</span></div></section>;
+  return <section className="caller-strip" aria-label="Current bingo call"><div className="caller-strip-top"><span className="kicker">🎤 CONFESSION {game.calledCount} OF {prompts.length}</span><span className="call-live">● LIVE CALL</span></div><div className="called-statement"><span>{prompt.emoji}</span><h2>Never have I ever… <strong>{phrase}</strong></h2></div><AnswerClock seconds={seconds}/><div className="caller-actions"><button className={`answer yes ${myAnswer==='yes'?'chosen':''}`} onClick={()=>onAnswer('yes')} disabled={answer!==null||seconds===0}>🙋 Yes, I have</button><button className={`answer no ${myAnswer==='no'?'chosen':''}`} onClick={()=>onAnswer('no')} disabled={answer!==null||seconds===0}>🙅 No, I haven&apos;t</button></div><div className="call-foot"><span>{seconds===0?'Answer time has ended.':myAnswer ? `You answered ${myAnswer.toUpperCase()}. ${myAnswer==='yes'?'Square marked if it’s on your card!':''}` : 'A “yes” marks your square automatically if it’s on your card.'}</span><span>🙋 {game.yes} yes &nbsp; 🙅 {game.no} no</span></div></section>;
 }
