@@ -1,6 +1,6 @@
 # AI Confessions Bingo 🎉
 
-A playful, mobile-friendly bingo game for an in-person or remote UX off-site. One facilitator calls random “Never have I ever…” statements. Players answer **yes** or **no** by tapping or using their browser microphone. A yes marks the square when it appears on their card. The host screen shows live totals and announces bingo winners.
+A playful, mobile-friendly bingo game for an in-person or remote UX off-site. One facilitator calls random “Never have I ever…” statements. Players answer **yes** or **no** by tapping. A yes marks the square when it appears on their card. The host screen shows live totals and announces bingo winners.
 
 This is a **self-hosted Railway edition** of the app. It uses PostgreSQL instead of the original Cloudflare D1 database. It starts with **fresh cards, confessions, calls, and winners**; it does not import data from the existing ChatGPT Site.
 
@@ -29,8 +29,9 @@ The PostgreSQL service should stay private to the Railway project. The app needs
 1. Open `/caller` on the host screen and enter `CALLER_PIN`.
 2. Share the player URL displayed there with everyone, including remote participants.
 3. Press **Call the first one**, read the statement aloud, and let people answer. Press **Next confession** when ready.
-4. Players can tap **Yes, me!** or **Not me**, or tap **Say yes / no** and speak. Browser microphone support varies; the buttons always work.
-5. A player with bingo can enter a name or nickname. The name appears on the host screen so they can claim a prize. Individual answers remain visible only as team totals.
+4. Players tap **Yes, me!** or **Not me**. The player screen shows this round's yes/no results.
+5. A player with bingo can enter a name or nickname. Each distinct completed row, column, or diagonal can be announced once. Every announcement appears on the host screen so they can claim a prize. Individual answers remain visible only as team totals.
+6. To play again, the caller presses **Start a new game for everyone** and confirms. All open player tabs receive fresh cards within a few seconds; answers, calls, and winner announcements are cleared.
 
 The caller PIN is kept in that browser tab's session storage after the first successful call. Attendees do not need the PIN to play.
 
@@ -56,10 +57,10 @@ Open `http://localhost:3000` for players and `http://localhost:3000/caller` for 
 | `CALLER_PIN` | Host-only passphrase for advancing calls; minimum 8 characters |
 | `PORT` | Provided by Railway; defaults to 3000 locally |
 
-The Docker image runs its idempotent schema setup when it starts, then starts Next.js. It can be deployed again without clearing game data. A caller can run through all 30 prompts once; the app does not include a reset control.
+The Docker image runs its idempotent schema setup when it starts, then starts Next.js. It can be deployed again without clearing game data. A caller can run through all 30 prompts per game, then start a fresh game from the caller screen.
 
 ## Privacy and access
 
-Players have random IDs stored on their own device. The database stores those IDs with yes/no answers and checked confessions; it does not collect email addresses or microphone recordings. Team totals are shown publicly to anyone who can open the app. A winner's name or nickname is displayed only after they choose to announce it. The browser's speech recognition feature may use the browser vendor's service, depending on the browser. Use the tap buttons if that is a concern.
+Players have random IDs stored on their own device. The database stores those IDs with yes/no answers and checked confessions; it does not collect email addresses or microphone recordings. Team totals are shown publicly to anyone who can open the app. A winner's name or nickname is displayed only after they choose to announce it.
 
 This edition does not include player sign-in. Anyone with the public player URL can participate. Keep `CALLER_PIN` private so only the facilitator can advance the prompts.
