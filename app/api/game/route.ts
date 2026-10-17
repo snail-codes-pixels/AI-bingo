@@ -15,7 +15,9 @@ async function snapshot() {
     pool.query<{ game_id: string }>('SELECT game_id FROM game_state WHERE id=1'),
     pool.query<{ prompt_id: string; count: string }>('SELECT prompt_id, count(*) AS count FROM confessions GROUP BY prompt_id'),
     pool.query<{ count: string }>('SELECT count(*) AS count FROM participants'),
-    pool.query<{ id: string; prompt_id: string }>('SELECT id, prompt_id FROM calls ORDER BY id DESC LIMIT 1'),
+    pool.query<{ id: string; prompt_id: string; remaining_ms: number | null }>(`SELECT id, prompt_id,
+      CASE WHEN answer_ends_at IS NULL THEN NULL ELSE GREATEST(0, EXTRACT(EPOCH FROM (answer_ends_at - now())) * 1000)::integer END AS remaining_ms
+      FROM calls ORDER BY id DESC LIMIT 1`),
     pool.query<{ count: string }>('SELECT count(*) AS count FROM calls'),
     pool.query<{ id: string; display_name: string; won_at: Date; win_number: string }>(`SELECT id, display_name, won_at,
       row_number() OVER (PARTITION BY participant_id ORDER BY won_at, id) AS win_number
@@ -32,7 +34,7 @@ async function snapshot() {
     gameId: Number(state.rows[0]?.game_id ?? 1),
     counts: Object.fromEntries(counts.rows.map(row => [row.prompt_id, Number(row.count)])),
     participants: Number(participants.rows[0]?.count ?? 0),
-    currentCall: current ? { id: Number(current.id), promptId: current.prompt_id } : null,
+    currentCall: current ? { id: Number(current.id), promptId: current.prompt_id, remainingMs: current.remaining_ms } : null,
     calledCount: Number(called.rows[0]?.count ?? 0), yes, no,
     winners: winners.rows.map(row => ({ id: Number(row.id), name: row.display_name, wonAt: row.won_at, winNumber: Number(row.win_number) })),
   };
@@ -71,7 +73,7 @@ export async function POST(request: Request) {
           const remaining = prompts.filter(prompt => !used.has(prompt.id));
           if (!remaining.length) { await client.query('ROLLBACK'); return Response.json({ error: 'Every confession has been called.' }, { status: 409 }); }
           const choice = remaining[Math.floor(Math.random() * remaining.length)];
-          await client.query('INSERT INTO calls(prompt_id) VALUES ($1)', [choice.id]);
+          await client.query("INSERT INTO calls(prompt_id, answer_ends_at) VALUES ($1, now() + interval '30 seconds')", [choice.id]);
         }
         await client.query('COMMIT');
       } catch (error) { await client.query('ROLLBACK'); throw error; }
@@ -92,9 +94,10 @@ export async function POST(request: Request) {
       await client.query('INSERT INTO participants(id) VALUES ($1) ON CONFLICT DO NOTHING', [participantId]);
       if (data.action === 'answer') {
         if (data.answer !== 'yes' && data.answer !== 'no') { await client.query('ROLLBACK'); return Response.json({ error: 'Answer yes or no.' }, { status: 400 }); }
-        const latest = await client.query<{ id: string; prompt_id: string }>('SELECT id, prompt_id FROM calls ORDER BY id DESC LIMIT 1');
+        const latest = await client.query<{ id: string; prompt_id: string; answer_open: boolean }>('SELECT id, prompt_id, (answer_ends_at IS NULL OR answer_ends_at > now()) AS answer_open FROM calls ORDER BY id DESC LIMIT 1');
         const call = latest.rows[0];
         if (!call || Number(call.id) !== data.callId) { await client.query('ROLLBACK'); return Response.json({ error: 'That round has moved on. Try the current one.' }, { status: 409 }); }
+        if (!call.answer_open) { await client.query('ROLLBACK'); return Response.json({ error: 'Time is up for this confession. Wait for the next one.' }, { status: 409 }); }
         await client.query('INSERT INTO call_answers(call_id, participant_id, answer) VALUES ($1,$2,$3) ON CONFLICT(call_id, participant_id) DO UPDATE SET answer=EXCLUDED.answer', [call.id, participantId, data.answer]);
         if (data.answer === 'yes') await client.query('INSERT INTO confessions(participant_id, prompt_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [participantId, call.prompt_id]);
         else await client.query('DELETE FROM confessions WHERE participant_id=$1 AND prompt_id=$2', [participantId, call.prompt_id]);
