@@ -11,6 +11,11 @@ export async function migrate() {
       id uuid PRIMARY KEY,
       joined_at timestamptz NOT NULL DEFAULT now()
     )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS game_state (
+      id integer PRIMARY KEY CHECK (id = 1),
+      game_id bigint NOT NULL
+    )`);
+    await client.query('INSERT INTO game_state(id, game_id) VALUES (1, 1) ON CONFLICT DO NOTHING');
     await client.query(`CREATE TABLE IF NOT EXISTS confessions (
       participant_id uuid NOT NULL REFERENCES participants(id),
       prompt_id text NOT NULL,
@@ -33,6 +38,17 @@ export async function migrate() {
       display_name text NOT NULL,
       won_at timestamptz NOT NULL DEFAULT now()
     )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS winner_events (
+      id bigserial PRIMARY KEY,
+      participant_id uuid NOT NULL REFERENCES participants(id),
+      line_id text NOT NULL,
+      display_name text NOT NULL,
+      won_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (participant_id, line_id)
+    )`);
+    await client.query(`INSERT INTO winner_events(participant_id, line_id, display_name, won_at)
+      SELECT participant_id, 'legacy', display_name, won_at FROM winners WHERE true
+      ON CONFLICT (participant_id, line_id) DO NOTHING`);
     await client.query('COMMIT');
     console.log('Database ready');
   } catch (error) {
