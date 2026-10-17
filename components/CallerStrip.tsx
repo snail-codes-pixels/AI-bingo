@@ -1,18 +1,24 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { prompts } from '../lib/prompts';
 import type { GameSnapshot } from '../lib/game-types';
 
 export function useAnswerSeconds(game: GameSnapshot) {
   const [now, setNow] = useState(0);
+  const shown = useRef<{ call: string; seconds: number | null }>({ call: '', seconds: null });
   useEffect(() => {
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timer);
   }, []);
+  const call = `${game.gameId}-${game.currentCall?.id ?? ''}`;
   const remaining = game.currentCall?.remainingMs;
+  if (shown.current.call !== call) shown.current = { call, seconds: null };
   if (remaining == null || !now || !game.receivedAt) return null;
-  return Math.max(0, Math.ceil((remaining - (now - game.receivedAt)) / 1000));
+  const seconds = Math.max(0, Math.ceil((remaining - (now - game.receivedAt)) / 1000));
+  // A delayed poll must never reopen an answer window that already reached zero.
+  shown.current.seconds = shown.current.seconds === null ? seconds : Math.min(shown.current.seconds, seconds);
+  return shown.current.seconds;
 }
 
 export function AnswerClock({ seconds, host = false }: { seconds: number | null; host?: boolean }) {
