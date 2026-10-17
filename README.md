@@ -29,7 +29,7 @@ The PostgreSQL service should stay private to the Railway project. The app needs
 1. Open `/caller` on the host screen and enter `CALLER_PIN`.
 2. Share the player URL displayed there with everyone, including remote participants.
 3. Press **Call the first one**, read the statement aloud, and let people answer. Press **Next confession** when ready.
-4. Players tap **Yes, me!** or **Not me**. The player screen shows this round's yes/no results.
+4. Players tap **Yes, I have** or **No, I haven't**. The player screen shows this round's yes/no results.
 5. A player with bingo can enter a name or nickname. Each distinct completed row, column, or diagonal can be announced once. Every announcement appears on the host screen so they can claim a prize. Individual answers remain visible only as team totals.
 6. To play again, the caller presses **Start a new game for everyone** and confirms. All open player tabs receive fresh cards within a few seconds; answers, calls, and winner announcements are cleared.
 
