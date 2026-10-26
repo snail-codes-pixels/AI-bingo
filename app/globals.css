@@ -59,3 +59,11 @@
 .card .tile.checked:hover{border-color:#eb9d72}
 .card .tile.free:hover{transform:rotate(-2deg);border-color:#dc7452}
 .mix:disabled{cursor:default;opacity:.65}
+
+/* Both player answers start equal; the chosen one stays visibly selected. */
+.caller-strip .caller-actions .answer{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:1 1 0;min-width:0;min-height:46px;border:2px solid #dfbda9;background:#fffaf5;color:#674a3d;box-shadow:0 2px 0 #eacbb9;transition:background .16s,border-color .16s,box-shadow .16s,transform .16s}
+.caller-strip .caller-actions .answer:not(:disabled):hover{background:#fff0e4;border-color:#d88967;transform:translateY(-1px)}
+.caller-strip .caller-actions .answer.chosen{border-color:#bc6243;background:#d97552;color:#fffaf5;box-shadow:0 3px 0 #a85238;outline:none}
+.caller-strip .caller-actions .answer:disabled{cursor:default;opacity:.58}
+.caller-strip .caller-actions .answer.chosen:disabled{opacity:1}
+.answer-picked{display:grid;place-items:center;width:20px;height:20px;flex:none;border-radius:50%;background:#fff9ee;color:#ad5b3e;font-size:13px;font-weight:900}
