@@ -9,11 +9,12 @@ const noStore = { 'Cache-Control': 'no-store' };
 const uuid = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const gameLock = "SELECT pg_advisory_xact_lock(hashtext('ai-confessions-bingo-caller'))";
 
-async function snapshot() {
+async function snapshot(participantId?: string) {
   const pool = getPool();
   const [state, counts, participants, latest, called, winners] = await Promise.all([
     pool.query<{ game_id: string }>('SELECT game_id FROM game_state WHERE id=1'),
-    pool.query<{ prompt_id: string; count: string }>('SELECT prompt_id, count(*) AS count FROM confessions GROUP BY prompt_id'),
+    pool.query<{ prompt_id: string; count: string }>(`SELECT calls.prompt_id, count(*) AS count FROM call_answers
+      JOIN calls ON calls.id = call_answers.call_id WHERE call_answers.answer = 'yes' GROUP BY calls.prompt_id`),
     pool.query<{ count: string }>('SELECT count(*) AS count FROM participants'),
     pool.query<{ id: string; prompt_id: string; remaining_ms: number | null }>(`SELECT id, prompt_id,
       CASE WHEN answer_ends_at IS NULL THEN NULL ELSE GREATEST(0, EXTRACT(EPOCH FROM (answer_ends_at - now())) * 1000)::integer END AS remaining_ms
@@ -30,12 +31,14 @@ async function snapshot() {
     yes = Number(answers.rows.find(row => row.answer === 'yes')?.count ?? 0);
     no = Number(answers.rows.find(row => row.answer === 'no')?.count ?? 0);
   }
+  const markedPromptIds = participantId ? (await pool.query<{ prompt_id: string }>(`SELECT calls.prompt_id FROM call_answers
+    JOIN calls ON calls.id = call_answers.call_id WHERE call_answers.participant_id = $1 AND call_answers.answer = 'yes'`, [participantId])).rows.map(row => row.prompt_id) : undefined;
   return {
     gameId: Number(state.rows[0]?.game_id ?? 1),
     counts: Object.fromEntries(counts.rows.map(row => [row.prompt_id, Number(row.count)])),
     participants: Number(participants.rows[0]?.count ?? 0),
     currentCall: current ? { id: Number(current.id), promptId: current.prompt_id, remainingMs: current.remaining_ms } : null,
-    calledCount: Number(called.rows[0]?.count ?? 0), yes, no,
+    calledCount: Number(called.rows[0]?.count ?? 0), yes, no, markedPromptIds,
     winners: winners.rows.map(row => ({ id: Number(row.id), name: row.display_name, wonAt: row.won_at, winNumber: Number(row.win_number) })),
   };
 }
@@ -106,19 +109,19 @@ export async function POST(request: Request) {
         const card = data.card;
         const lineId = data.lineId;
         if (!name || typeof lineId !== 'string' || !Array.isArray(card) || card.length !== 25 || card[12] !== 'free' || new Set(card).size !== 25 || card.some(id => typeof id !== 'string' || (id !== 'free' && !promptIds.has(id)))) { await client.query('ROLLBACK'); return Response.json({ error: 'Add a name to claim your bingo.' }, { status: 400 }); }
-        const markedRows = await client.query<{ prompt_id: string }>('SELECT prompt_id FROM confessions WHERE participant_id=$1', [participantId]);
+        const markedRows = await client.query<{ prompt_id: string }>(`SELECT calls.prompt_id FROM call_answers
+          JOIN calls ON calls.id = call_answers.call_id WHERE call_answers.participant_id=$1 AND call_answers.answer='yes'`, [participantId]);
         const marked = new Set(markedRows.rows.map(row => row.prompt_id));
         if (!completedLineIds(card, marked).includes(lineId)) { await client.query('ROLLBACK'); return Response.json({ error: 'That bingo line is still one square away.' }, { status: 400 }); }
         await client.query('INSERT INTO winner_events(participant_id,line_id,display_name) VALUES ($1,$2,$3) ON CONFLICT(participant_id,line_id) DO NOTHING', [participantId,lineId,name]);
       } else if (data.promptId !== undefined) {
-        if (typeof data.promptId !== 'string' || !promptIds.has(data.promptId) || typeof data.checked !== 'boolean') { await client.query('ROLLBACK'); return Response.json({ error: 'Invalid square.' }, { status: 400 }); }
-        if (data.checked) await client.query('INSERT INTO confessions(participant_id,prompt_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [participantId,data.promptId]);
-        else await client.query('DELETE FROM confessions WHERE participant_id=$1 AND prompt_id=$2', [participantId,data.promptId]);
+        await client.query('ROLLBACK');
+        return Response.json({ error: 'Squares mark when you answer a called confession.' }, { status: 400 });
       }
       await client.query('COMMIT');
     } catch (error) { await client.query('ROLLBACK'); throw error; }
     finally { client.release(); }
-    return Response.json(await snapshot(), { headers: noStore });
+    return Response.json(await snapshot(participantId), { headers: noStore });
   } catch (error) {
     console.error('Game API error:', error);
     return Response.json({ error: 'Couldn’t save that. Try again.' }, { status: 500 });

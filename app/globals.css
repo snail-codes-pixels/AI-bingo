@@ -53,3 +53,9 @@
 .caller-strip .answer-clock:not(.answer-clock-done){background:#fffaf4;border-color:#e8bea6;color:#865138}
 .caller-strip .answer-clock-soon:not(.answer-clock-done){background:#ffe0ca;border-color:#e8a17d;color:#78442e}
 .caller-strip .answer-clock-done{background:#f5e9de;border-color:#e7c8b5;color:#75594b}
+
+/* Card squares are a read-only record of timed answers. */
+.card .tile:hover{transform:none;border-color:#efdacb}
+.card .tile.checked:hover{border-color:#eb9d72}
+.card .tile.free:hover{transform:rotate(-2deg);border-color:#dc7452}
+.mix:disabled{cursor:default;opacity:.65}

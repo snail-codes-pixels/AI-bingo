@@ -7,5 +7,6 @@ export type GameSnapshot = {
   calledCount: number;
   yes: number;
   no: number;
+  markedPromptIds?: string[];
   winners: { id: number; name: string; wonAt: string; winNumber: number }[];
 };
